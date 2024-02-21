@@ -1,0 +1,240 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+import datetime as dt
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis,QuadraticDiscriminantAnalysis
+from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.naive_bayes import GaussianNB
+from sklearn import preprocessing
+from sklearn import model_selection
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import roc_auc_score,r2_score,mean_absolute_error,mean_squared_error,accuracy_score,classification_report,confusion_matrix
+from sklearn.model_selection import train_test_split,cross_val_score, cross_val_predict
+from sklearn import svm,metrics,tree,preprocessing,linear_model
+from sklearn.preprocessing import MinMaxScaler,StandardScaler
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LinearRegression,LogisticRegression
+from sklearn.ensemble import RandomForestRegressor,RandomForestClassifier, GradientBoostingRegressor
+from sklearn.metrics import accuracy_score,mean_squared_error,recall_score,confusion_matrix,f1_score,roc_curve, auc
+from plotly.offline import iplot, init_notebook_mode
+import pickle
+import warnings
+warnings.filterwarnings("ignore")
+import datetime as dt
+from datetime import datetime
+import plotly.express as px
+from scipy.optimize import linprog
+from pylab import rcParams
+import scipy
+from scipy.stats.stats import pearsonr
+import seaborn as sb
+from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn import preprocessing
+from sklearn import utils
+from sklearn.metrics import top_k_accuracy_score
+from sklearn.metrics import classification_report
+
+#importing csv file
+SC = pd.read_csv('Supply Chain.csv')
+
+#changing all column names to lower case and replacing space with an underscore
+SC.columns = [col.lower().replace(' ', '_') for col in SC.columns]
+
+#creating new column adding shipping costs, manufacturing costs, and other costs
+SC['total_costs'] = SC['shipping_costs'] + SC['manufacturing_costs'] + SC['costs']
+
+#HISTOGRAMS OF NUMERICAL DATA
+haircare = SC[SC['product_type'] == 'haircare'] #filtering for just haircare products
+
+
+skincare = SC[SC['product_type'] == 'skincare'] #filterig for only skincare products
+
+
+cosmetics = SC[SC['product_type'] == 'cosmetics'] #filtering for only cosmetics products
+
+fig = plt.figure(figsize=(10,20)) # adjusting figure size
+
+#creating histograms for each product for price
+plt.subplot(4,2,1)
+sns.histplot(data=SC,x='price',color='darkred')
+
+plt.subplot(4,2,2)
+sns.histplot(data=haircare,x='price',color='darkorange')
+
+plt.subplot(4,2,3)
+sns.histplot(data=skincare,x='price',color='darkgreen')
+
+plt.subplot(4,2,4)
+sns.histplot(data=cosmetics,x='price',color='steelblue')
+
+#display the graphs
+plt.show()
+
+#Supplier Boxplots
+supplier = SC.groupby(['supplier_name','sku']).sum().reset_index() #new dataframe grouped by supplier and sku
+
+fig = plt.figure(figsize=(20,20)) #adjusting size of figure
+
+#box plot of manufacturing cost by each supplier
+sns.boxplot(data=supplier,x='supplier_name',y='manufacturing_costs',hue='supplier_name')
+plt.show()
+
+#CREATING NEW DATAFRAMES GROUPED BY SUPPLIER, TRANSPORTATION MODE, ROUTE, LOCATION, AND CARRIER
+supplier_count = SC.groupby('supplier_name')['supplier_name'].count().reset_index(name='count')
+transpo_count = SC.groupby('transportation_modes')['transportation_modes'].count().reset_index(name='count')
+routes_count = SC.groupby('routes')['routes'].count().reset_index(name='count')
+location_count = SC.groupby('location')['location'].count().reset_index(name='count')
+carrier_count = SC.groupby('shipping_carriers')['shipping_carriers'].count().reset_index(name='count')
+
+#concatenating new dfs into one and exporting as csv to format table in excel
+tables = pd.concat([supplier_count,transpo_count,routes_count,carrier_count])
+tables.to_csv('counts.csv')
+
+#pie chart of suppliers
+fig, ax = plt.subplots()
+ax.pie(supplier_count['count'],labels = supplier_count['supplier_name'],autopct='%1.1f%%')
+ax.set(title='Figure 1.1: Supplier Percentage')
+plt.show()
+
+#pie chart of transportation modes
+fig, ax = plt.subplots()
+ax.pie(transpo_count['count'],labels = transpo_count['transportation_modes'],autopct='%1.1f%%')
+ax.set(title='Figure 1.3: Transportation Type Percentage')
+plt.show()
+
+#pie chart of routes
+fig, ax = plt.subplots()
+ax.pie(routes_count['count'],labels = routes_count['routes'],
+       autopct='%1.1f%%',colors=['steelblue','darkgreen','darkorange'])
+ax.set(title='Figure 1.4: Route Percentage')
+plt.show()
+
+#pie chart of carriers
+fig, ax = plt.subplots()
+ax.pie(carrier_count['count'],labels = carrier_count['shipping_carriers'],
+       autopct='%1.1f%%')
+ax.set(title='Figure 1.2: Carrier Percentage')
+plt.show()
+
+#NEW DATAFRAME GROUPED BY PRODUCT TYPE - SUM OF PRODCUTS SOLD, ORDER QUANTITIES, AND REVENUE GENERATED
+product_counts = SC.groupby('product_type').agg({'number_of_products_sold':'sum','order_quantities':'sum','revenue_generated':'sum'}).reset_index()
+print(product_counts)
+
+#pie chart of products sold by product type
+fig, ax = plt.subplots()
+ax.pie(product_counts['number_of_products_sold'],labels = product_counts['product_type'],
+       autopct='%1.1f%%')
+ax.set(title='Figure 2.5: Percentage of Total Products Sold')
+plt.show()
+
+#pie chart of order quantities by product type
+fig, ax = plt.subplots()
+ax.pie(product_counts['order_quantities'],labels = product_counts['product_type'],
+       autopct='%1.1f%%')
+ax.set(title='Percentage of Total Order Quantities')
+plt.show()
+
+#pie chart of revenue generated by product type
+fig, ax = plt.subplots()
+ax.pie(product_counts['revenue_generated'],labels = product_counts['product_type'],
+       autopct='%1.1f%%')
+ax.set(title='Figure 2.6: Percentage of Total Revenue Generated')
+plt.show()
+
+#CREATING NEW DATAFRAME GROUPED BY PRODUCT TYPE
+product_data = SC.groupby('product_type').sum().reset_index()
+
+#CREATING NEW COLUMNS BASED ON CALCULATIONS
+product_data['unit_revenue'] = round(product_data['revenue_generated']/product_data['number_of_products_sold'],2)
+product_data['sales_margin'] = product_data['unit_revenue'] - product_data['price']
+product_data['unit_cost'] = round((product_data['costs']+product_data['manufacturing_costs']+product_data['shipping_costs'])/product_data['number_of_products_sold'],2)
+product_data['profit_margin'] = product_data['unit_revenue'] - product_data['unit_cost']
+
+
+#setting style of seaborn graphs
+sns.set_style(style='darkgrid')
+
+#bar plot of stock levels by product type
+bar1 = sns.barplot(data=product_data,x='product_type',y='stock_levels',hue='product_type')
+bar1.set_title('Figure 3.1: Stock Levels by Product Type') #setting title
+bar1.set(xlabel='',ylabel='Stock Levels') #setting axis labels
+plt.show()
+
+#bar plot of order quantitiy by product type
+bar2 = sns.barplot(data=product_data,x='product_type',y='order_quantities',hue='product_type')
+bar2.set_title('Figure 3.2: Order Quantities by Product Type')
+bar2.set(xlabel='',ylabel='Order Quantities')
+plt.show()
+
+#bar plot of total cost by product type
+bar3 = sns.barplot(data=product_data,x='product_type',y='total_costs',hue='product_type')
+bar3.set_title('Total Costs by Product Type')
+bar3.set(xlabel='',ylabel='Total Costs')
+plt.show()
+
+#bar plot of revenue generated by product type
+bar4 = sns.barplot(data=product_data,x='product_type',y='revenue_generated',hue='product_type')
+bar4.set_title('Revenue Generated by Product Type')
+bar4.set(xlabel='',ylabel='Revenue Generated')
+plt.show()
+
+#Mean lead time, manufacturing volumne, and cost by product type by supplier
+supplier_data = SC.groupby(['supplier_name','product_type']).agg({'manufacturing_lead_time':'mean','production_volumes':'mean','manufacturing_costs':'mean'}).reset_index()
+
+sns.set_style('darkgrid') #setting seaborn style
+
+
+#bar plot of mean lead time by supplier by product type
+bar1 = sns.catplot(kind='bar',data=supplier_data,x='supplier_name',y='manufacturing_lead_time',hue='product_type')
+bar1.fig.suptitle('Figure 4.1: Mean Manufacturing Lead Time by Supplier and Product Type',y=1.03,x=.45)
+bar1.set(xlabel = '',ylabel = 'Mean Manufacturing Lead Time')
+plt.show(bar1)
+
+#bar plot of mean production volume for each supplier by product type
+bar2 = sns.catplot(kind='bar',data=supplier_data,x='supplier_name',y='production_volumes',hue='product_type')
+bar2.fig.suptitle('Figure 4.2: Mean Production Volume by Supplier and Product Type',y=1.03,x=.45)
+bar2.set(xlabel = '',ylabel = 'Mean Production Volume')
+plt.show(bar2)
+
+#bar plot of mean manufacturing costs for each supplier by product type
+bar3 = sns.catplot(kind='bar',data=supplier_data,x='supplier_name',y='manufacturing_costs',hue='product_type')
+bar3.fig.suptitle('Figure 4.3: Mean Manufacturing Cost by Supplier and Product Type',y=1.03,x=.45)
+bar3.set(xlabel = '',ylabel = 'Mean Manufacturing Cost')
+plt.show(bar2)
+
+#Mean shipping time and cost  by product type by supplier
+shipping_data = SC.groupby(['shipping_carriers','product_type']).agg({'shipping_costs':'mean','shipping_times':'mean'}).reset_index()
+
+sns.set_style('darkgrid')
+
+#bar plot for mean shipping time for each carrier by product type
+bar1 = sns.catplot(kind='bar',data=shipping_data,x='shipping_carriers',y='shipping_times',hue='product_type')
+bar1.fig.suptitle('Figure 5.1: Mean Shipping Times by Supplier and Product Type',y=1.03,x=.45)
+bar1.set(xlabel = '',ylabel = 'Mean Shipping Times')
+plt.show(bar1)
+
+#bar plot form mean shipping costs for each carrier by product type
+bar2 = sns.catplot(kind='bar',data=shipping_data,x='shipping_carriers',y='shipping_costs',hue='product_type')
+bar2.fig.suptitle('Figure 5.2: Mean Shipping Costs by Supplier and Product Type',y=1.03,x=.45)
+bar2.set(xlabel = '',ylabel = 'Mean Shipping Costs')
+plt.show(bar2)
+
+
+#Mean shipping time by route for carrier C
+carrier_c = SC[SC['shipping_carriers'] == 'Carrier C']
+route_c = carrier_c.groupby(['routes','product_type']).agg({'shipping_times':'mean','shipping_costs':'mean'}).reset_index()
+
+#Mean shipping time by route for carrier B
+carrier_b = SC[(SC['shipping_carriers'] == 'Carrier B') & (SC['product_type'] == 'skincare')]
+route_b = carrier_b.groupby(['routes','product_type']).agg({'shipping_times':'mean','shipping_costs':'mean'}).reset_index()
+
+print(route_b)
+#export dataframe to csv to format in excel
+route_b.to_csv('route_table.csv')
